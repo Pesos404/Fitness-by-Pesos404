@@ -50,13 +50,12 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .top{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .top>div:first-child{flex:1;min-width:210px}
 .mood{width:96px;flex:none;margin:0 auto;text-align:center}
-.mood svg{width:72px;height:72px;display:block;margin:0 auto}
+.mood svg{width:80px;height:83px;display:block;margin:0 auto;overflow:visible}
 .mood b{display:block;font-size:15px;margin-top:2px;line-height:1.2}
 .mood small{display:block;color:var(--mut);font-size:13px;line-height:1.25}
-.fz{--fc:var(--acc)}.fa{--fc:var(--p)}.fm{--fc:var(--c)}
-.fbg{fill:var(--surf);fill:color-mix(in srgb,var(--fc) 22%,var(--surf));stroke:var(--fc);stroke-width:5}
-.fe{fill:none;stroke:var(--ink);stroke-width:5;stroke-linecap:round;stroke-linejoin:round}
-.fd{fill:var(--ink)}
+.fz{--fl:#9BE8D2;--fc:#2FB59A;--fk:#0E7A66}
+.fa{--fl:#FFA79C;--fc:#E5574C;--fk:#A12B24}
+.fm{--fl:#FFE494;--fc:#F2B134;--fk:#B57414}
 .hint{border-left:3px solid var(--acc);padding:2px 10px;margin:12px 0 0}
 .chk{display:flex;gap:8px;align-items:center;color:var(--ink);font-size:16px;margin-top:14px}
 .chk input{width:auto}
@@ -182,10 +181,15 @@ const NUT=[
  {id:'f',l:'Fett',col:'--f',kcal:9,pie:1},
  {id:'b',l:'Ballaststoffe',col:'--b'}
 ];
+const K='#1D2A33';
+const FDEFS='<defs><radialGradient id="fg" cx=".35" cy=".28" r=".85"><stop offset="0" style="stop-color:var(--fl)"/><stop offset=".55" style="stop-color:var(--fc)"/><stop offset="1" style="stop-color:var(--fk)"/></radialGradient><linearGradient id="fh" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".8"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient><filter id="fb" x="-30%" y="-150%" width="160%" height="400%"><feGaussianBlur stdDeviation="2.5"/></filter></defs>'+
+ '<ellipse cx="50" cy="98" rx="27" ry="4.5" fill="#000" opacity=".3" filter="url(#fb)"/><circle cx="50" cy="50" r="44" fill="url(#fg)"/><ellipse cx="37" cy="25" rx="21" ry="11" transform="rotate(-24 37 25)" fill="url(#fh)" opacity=".6"/>';
+const eye=(x,y)=>`<ellipse cx="${x}" cy="${y}" rx="5.5" ry="7" fill="${K}"/><circle cx="${x+2}" cy="${y-3}" r="2.2" fill="#fff"/>`;
+const cheeks='<ellipse cx="25" cy="60" rx="7" ry="4.5" fill="#FF93AE" opacity=".85"/><ellipse cx="75" cy="60" rx="7" ry="4.5" fill="#FF93AE" opacity=".85"/>';
 const FACES={
- a:'<path class="fe" d="M24 33L42 41M76 33L58 41"/><circle class="fd" cx="36" cy="52" r="4.5"/><circle class="fd" cx="64" cy="52" r="4.5"/><path class="fe" d="M33 75Q50 59 67 75"/>',
- z:'<circle class="fd" cx="36" cy="42" r="4.5"/><circle class="fd" cx="64" cy="42" r="4.5"/><path class="fe" d="M30 60Q50 80 70 60"/>',
- m:'<circle class="fd" cx="36" cy="42" r="4.5"/><path class="fe" d="M55 43Q64 34 73 43"/><path class="fd" d="M28 58Q50 90 72 58Z" stroke="var(--ink)" stroke-width="4" stroke-linejoin="round"/>'
+ a:`<path d="M25 33L43 40M75 33L57 40" fill="none" stroke="${K}" stroke-width="6" stroke-linecap="round"/>${eye(36,51)}${eye(64,51)}<path d="M35 75Q50 63 65 75" fill="none" stroke="${K}" stroke-width="5" stroke-linecap="round"/>`,
+ z:`${eye(36,44)}${eye(64,44)}${cheeks}<path d="M33 60Q50 78 67 60" fill="none" stroke="${K}" stroke-width="5" stroke-linecap="round"/>`,
+ m:`${eye(36,44)}<path d="M57 45Q65 37 73 45" fill="none" stroke="${K}" stroke-width="5" stroke-linecap="round"/>${cheeks}<path d="M30 58Q50 63 70 58Q66 84 50 84Q34 84 30 58Z" fill="${K}"/><ellipse cx="50" cy="77" rx="9" ry="5" fill="#FF7A8A"/><path d="M33 59Q50 64 67 59L66 64Q50 69 34 64Z" fill="#fff"/>`
 };
 function mood(t,G){
  const L=[['Kalorien','k'],['Kohlenhydrate','c'],['Fett','f'],['Zucker','s']].filter(([,i])=>G[i]>0).map(([n,i])=>({n,r:t[i]/G[i]}));
@@ -216,7 +220,7 @@ function render(){
  const md=mood(t,G);
  $('#sum').innerHTML=`<div class="top"><div><p class="big"><b>${nf.format(Math.abs(r0(rem)))}</b> kcal ${rem>=0?'übrig':'über dem Ziel'}</p>
  <p class="sub">${nf.format(r0(t.k))} von ${nf.format(G.k)} kcal gegessen</p></div>
- <div class="mood"><svg viewBox="0 0 100 100" class="f${md.id==='a'?'a':md.id==='m'?'m':'z'}" role="img" aria-label="Stimmung: ${md.l}, ${md.d}"><circle class="fbg" cx="50" cy="50" r="44"/>${FACES[md.id]}</svg><b>${md.l}</b><small>${md.d}</small></div></div>
+ <div class="mood"><svg viewBox="0 0 100 104" class="f${md.id==='a'?'a':md.id==='m'?'m':'z'}" role="img" aria-label="Stimmung: ${md.l}, ${md.d}">${FDEFS}${FACES[md.id]}</svg><b>${md.l}</b><small>${md.d}</small></div></div>
  ${donut(t)}${NUT.map(mac).join('')}
  ${!S.profile.manual&&!S.profile.set?'<p class="hint">Deine Ziele basieren noch auf Beispielwerten. Trage unter „Ziele“ deine Daten ein.</p>':''}`;
  $('#meals').innerHTML=M.map(([id,lab])=>{const L=d[id]||[];
