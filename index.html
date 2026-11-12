@@ -47,6 +47,16 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .lg li{display:grid;grid-template-columns:auto 1fr;gap:0 8px;align-items:center;padding:6px 0}
 .lg .dot{margin-right:0}
 .lg small{display:block;color:var(--mut);font-size:14px}
+.top{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.top>div:first-child{flex:1;min-width:210px}
+.mood{width:96px;flex:none;margin:0 auto;text-align:center}
+.mood svg{width:72px;height:72px;display:block;margin:0 auto}
+.mood b{display:block;font-size:15px;margin-top:2px;line-height:1.2}
+.mood small{display:block;color:var(--mut);font-size:13px;line-height:1.25}
+.fz{--fc:var(--acc)}.fa{--fc:var(--p)}.fm{--fc:var(--c)}
+.fbg{fill:var(--surf);fill:color-mix(in srgb,var(--fc) 22%,var(--surf));stroke:var(--fc);stroke-width:5}
+.fe{fill:none;stroke:var(--ink);stroke-width:5;stroke-linecap:round;stroke-linejoin:round}
+.fd{fill:var(--ink)}
 .hint{border-left:3px solid var(--acc);padding:2px 10px;margin:12px 0 0}
 .chk{display:flex;gap:8px;align-items:center;color:var(--ink);font-size:16px;margin-top:14px}
 .chk input{width:auto}
@@ -87,7 +97,7 @@ textarea{height:140px;font-size:13px}
 <section id="meals"></section>
 <section id="wk"></section>
 <section id="wt"></section>
-<p class="fine">Alle Einträge bleiben in diesem Browser. Kein Konto, kein Abo, keine Zusatzpakete. Nährwerte sind gerundete Richtwerte pro 100 g. Z = Zucker (gesamt), B = Ballaststoffe. Online-Produktdaten stammen von Open Food Facts (ODbL), werden von der Community gepflegt und sind nicht immer vollständig.</p>
+<p class="fine">Alle Einträge bleiben in diesem Browser. Kein Konto, kein Abo, keine Zusatzpakete. Nährwerte sind gerundete Richtwerte pro 100 g. Z = Zucker (gesamt), B = Ballaststoffe. Smiley: wütend, sobald Kalorien, Kohlenhydrate, Fett oder Zucker über 120 % des Ziels liegen. Motivierend, solange alle vier unter 90 % liegen (Protein zählt nicht mit). Sonst zufrieden. Online-Produktdaten stammen von Open Food Facts (ODbL), werden von der Community gepflegt und sind nicht immer vollständig.</p>
 </main>
 <dialog id="dlg"></dialog>
 <script>
@@ -172,6 +182,18 @@ const NUT=[
  {id:'f',l:'Fett',col:'--f',kcal:9,pie:1},
  {id:'b',l:'Ballaststoffe',col:'--b'}
 ];
+const FACES={
+ a:'<path class="fe" d="M24 33L42 41M76 33L58 41"/><circle class="fd" cx="36" cy="52" r="4.5"/><circle class="fd" cx="64" cy="52" r="4.5"/><path class="fe" d="M33 75Q50 59 67 75"/>',
+ z:'<circle class="fd" cx="36" cy="42" r="4.5"/><circle class="fd" cx="64" cy="42" r="4.5"/><path class="fe" d="M30 60Q50 80 70 60"/>',
+ m:'<circle class="fd" cx="36" cy="42" r="4.5"/><path class="fe" d="M55 43Q64 34 73 43"/><path class="fd" d="M28 58Q50 90 72 58Z" stroke="var(--ink)" stroke-width="4" stroke-linejoin="round"/>'
+};
+function mood(t,G){
+ const L=[['Kalorien','k'],['Kohlenhydrate','c'],['Fett','f'],['Zucker','s']].filter(([,i])=>G[i]>0).map(([n,i])=>({n,r:t[i]/G[i]}));
+ const w=L.reduce((a,b)=>b.r>a.r?b:a,{n:'',r:0});
+ if(w.r>1.2)return{id:'a',l:'Zu viel',d:`${w.n} ${r0(w.r*100)} %`};
+ if(L.every(x=>x.r<.9))return{id:'m',l:'Weiter so',d:'noch Spielraum'};
+ return{id:'z',l:'Zufrieden',d:'im Rahmen'};
+}
 function donut(t){
  const R=52,C=2*Math.PI*R,P=NUT.filter(n=>n.pie),tot=P.reduce((a,n)=>a+t[n.id]*n.kcal,0);
  let off=0,arcs='';
@@ -191,8 +213,10 @@ function render(){
  const rem=G.k-t.k;
  const mac=n=>{const v=t[n.id],g=G[n.id]||0,over=n.max&&g&&v>g;
   return `<div class="mac${n.sub?' sub':''}"><span><i class="dot" style="background:var(${n.col})"></i>${n.l}</span><span${over?' class="over"':''}>${r0(v)} von ${n.max?'max. ':''}${g} g${over?' (über Limit)':''}</span><div class="mini"><i style="width:${Math.min(100,g?v/g*100:0)}%;background:var(${n.col})"></i></div></div>`};
- $('#sum').innerHTML=`<p class="big"><b>${nf.format(Math.abs(r0(rem)))}</b> kcal ${rem>=0?'übrig':'über dem Ziel'}</p>
- <p class="sub">${nf.format(r0(t.k))} von ${nf.format(G.k)} kcal gegessen</p>
+ const md=mood(t,G);
+ $('#sum').innerHTML=`<div class="top"><div><p class="big"><b>${nf.format(Math.abs(r0(rem)))}</b> kcal ${rem>=0?'übrig':'über dem Ziel'}</p>
+ <p class="sub">${nf.format(r0(t.k))} von ${nf.format(G.k)} kcal gegessen</p></div>
+ <div class="mood"><svg viewBox="0 0 100 100" class="f${md.id==='a'?'a':md.id==='m'?'m':'z'}" role="img" aria-label="Stimmung: ${md.l}, ${md.d}"><circle class="fbg" cx="50" cy="50" r="44"/>${FACES[md.id]}</svg><b>${md.l}</b><small>${md.d}</small></div></div>
  ${donut(t)}${NUT.map(mac).join('')}
  ${!S.profile.manual&&!S.profile.set?'<p class="hint">Deine Ziele basieren noch auf Beispielwerten. Trage unter „Ziele“ deine Daten ein.</p>':''}`;
  $('#meals').innerHTML=M.map(([id,lab])=>{const L=d[id]||[];
