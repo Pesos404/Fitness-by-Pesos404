@@ -1,4 +1,4 @@
-const V = 'bilanz-v5';
+const V = 'bilanz-v6';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 self.addEventListener('install', e => {
   // cache:'reload' umgeht den HTTP-Cache, damit immer die frischen Dateien gespeichert werden
@@ -20,9 +20,9 @@ self.addEventListener('fetch', e => {
       }).catch(() => caches.match(e.request).then(h => h || caches.match('./index.html')))
     );
   } else {
-    // Fremde Bibliothek (Scanner-Fallback): erst Zwischenspeicher
+    // Fremde Scanner-Bibliotheken: erst Zwischenspeicher
     e.respondWith(caches.match(e.request).then(hit => hit || fetch(e.request).then(r => {
-      if (r.ok && u.hostname === 'unpkg.com') { const c = r.clone(); caches.open(V).then(x => x.put(e.request, c)); }
+      if (r.ok && ['unpkg.com', 'fastly.jsdelivr.net', 'cdn.jsdelivr.net'].includes(u.hostname)) { const c = r.clone(); caches.open(V).then(x => x.put(e.request, c)); }
       return r;
     })));
   }

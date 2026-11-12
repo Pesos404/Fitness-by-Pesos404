@@ -87,7 +87,9 @@ textarea{height:140px;font-size:13px}
 .ent .ed{background:none;border:0;padding:0;text-align:left;width:100%}
 .rw{display:flex;gap:18px;flex-wrap:wrap}
 #wk{margin-top:30px;border-top:1px solid var(--line);padding-top:12px}
-#vw{border-radius:8px;overflow:hidden;background:#000;min-height:120px}
+#vw{position:relative;border-radius:8px;overflow:hidden;background:#000;min-height:120px}
+#vw::after{content:"";position:absolute;inset:22% 8%;border:2px solid rgba(255,255,255,.9);border-radius:10px;box-shadow:0 0 0 9999px rgba(0,0,0,.28);pointer-events:none}
+#vw[data-h5]::after{display:none}
 #vw video{width:100%;display:block}
 </style>
 </head>
@@ -281,7 +283,7 @@ function openAdd(m){
 }
 function all(){return [...S.custom,...FOODS]}
 function list(q){
- q=q.toLowerCase().trim();let a=all();
+ $('#res').hidden=false;q=q.toLowerCase().trim();let a=all();
  if(q)a=a.filter(f=>f.n.toLowerCase().includes(q)).sort((x,y)=>y.n.toLowerCase().startsWith(q)-x.n.toLowerCase().startsWith(q));
  else{const r=S.recent||[];a=[...r,...a.filter(f=>!r.some(x=>x.n===f.n))]}
  ctx.list=a.slice(0,40);
@@ -292,7 +294,7 @@ function pick(f){
  $('#pk').innerHTML=`<div class="pk"><b>${esc(f.n)}</b><small style="display:block;color:var(--mut)">pro 100 g: ${f.k} kcal, P ${f.p} / K ${f.c} / F ${f.f} / Z ${f.s||0} / B ${f.b||0}</small>
  <label for="gr">Menge in Gramm</label><input id="gr" type="number" inputmode="decimal" value="100" min="1"><p class="sub" id="pv"></p><button class="pri" id="ok">Zum Tag hinzufügen</button></div>`;
  const pv=()=>{const g=+$('#gr').value||0;$('#pv').textContent=r0(f.k*g/100)+' kcal'};
- $('#gr').addEventListener('input',pv);pv();$('#gr').select();
+ $('#res').hidden=true;$('#gr').addEventListener('input',pv);pv();$('#gr').select();$('#pk').scrollIntoView({block:'nearest'});
 }
 function newFood(){
  $('#pk').innerHTML=`<div class="pk"><b>Eigenes Lebensmittel (Werte pro 100 g)</b>
@@ -356,8 +358,8 @@ document.addEventListener('click',e=>{
   save();dlg.close();render()}
  else if(b.id==='sc')scan();
  else if(b.id==='ol')onlineSearch();
- else if(b.id==='stop'){stopScan();$('#pk').innerHTML=''}
- else if(b.id==='bs')lookup($('#bc').value);
+ else if(b.id==='stop'){stopScan();$('#pk').innerHTML='';$('#res').hidden=false}
+ else if(b.id==='bs'){stopScan();lookup($('#bc').value)}
  else if(b.dataset.edit){const[i,n]=b.dataset.edit.split(':'),e=dayOf(cur)[i][+n];ctx.ed={i,n:+n};
   openDlg(`<h2>${esc(e.n)}</h2><label for="eg">Menge in Gramm</label><input id="eg" type="number" inputmode="decimal" value="${e.g}" min="1"><div class="row"><button class="pri" id="es">Speichern</button><button class="ghost" data-close style="margin-left:auto">Abbrechen</button></div>`);$('#eg').select()}
  else if(b.id==='es'){const g=+$('#eg').value;if(!(g>0))return;const e=dayOf(cur)[ctx.ed.i][ctx.ed.n],x=g/e.g;Object.assign(e,{g,k:r1(e.k*x),p:r1(e.p*x),c:r1(e.c*x),f:r1(e.f*x),s:r1((e.s||0)*x),b:r1((e.b||0)*x)});save();dlg.close();render()}
@@ -368,33 +370,42 @@ document.addEventListener('click',e=>{
 });
 
 const OFF='https://world.openfoodfacts.org';
-const OFFQ='fields=code,product_name,brands,nutriments';
+const OFFQ='fields=code,product_name,product_name_de,generic_name,brands,nutriments';
 const H5='https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js';
-let stream=null,scanOn=false,h5=null;
-function stopScan(){scanOn=false;if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}
+const BD='https://fastly.jsdelivr.net/npm/barcode-detector@3/dist/es/ponyfill.min.js';
+let stream=null,scanOn=false,h5=null,scanT=0;
+function stopScan(){scanOn=false;clearTimeout(scanT);if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}
+ const v=$('#vd');if(v)v.srcObject=null;
  if(h5){const h=h5;h5=null;h.stop().then(()=>h.clear()).catch(()=>{})}}
 function loadScript(src){return new Promise((ok,no)=>{if(window.Html5Qrcode)return ok();const e=document.createElement('script');e.src=src;e.onload=ok;e.onerror=no;document.head.appendChild(e)})}
 function toFood(p){
- const n=p.nutriments||{};let k=n['energy-kcal_100g'];
- if(k==null&&n.energy_100g!=null)k=n.energy_100g/4.184;
- if(k==null||!p.product_name)return null;
- return{n:p.product_name+(p.brands?' ('+p.brands.split(',')[0].trim()+')':''),k:r0(k),p:r1(+n.proteins_100g||0),c:r1(+n.carbohydrates_100g||0),f:r1(+n.fat_100g||0),s:r1(+n.sugars_100g||0),b:r1(+n.fiber_100g||0),code:p.code}}
+ const n=p.nutriments||{},num=x=>x==null||x===''||isNaN(+x)?null:+x;
+ const pr=num(n.proteins_100g),ch=num(n.carbohydrates_100g),fa=num(n.fat_100g);
+ let k=num(n['energy-kcal_100g']);if(k==null)k=num(n['energy-kcal']);
+ if(k==null){const kj=num(n['energy-kj_100g']);const e=kj!=null?kj:num(n.energy_100g);if(e!=null)k=e/4.184}
+ if(k==null&&(pr!=null||ch!=null||fa!=null))k=(pr||0)*4+(ch||0)*4+(fa||0)*9;
+ const name=p.product_name_de||p.product_name||p.generic_name||'';
+ if(k==null||!name)return null;
+ return{n:name+(p.brands?' ('+p.brands.split(',')[0].trim()+')':''),k:r0(k),p:r1(pr||0),c:r1(ch||0),f:r1(fa||0),s:r1(+n.sugars_100g||0),b:r1(+n.fiber_100g||0),code:p.code}}
 async function lookup(code){
  code=String(code).replace(/\D/g,'');
+ if(code.length===12)code='0'+code;
  if(code.length<8){$('#pk').innerHTML='<p class="sub">Bitte einen gültigen Barcode eingeben (8 bis 13 Ziffern).</p>';return}
  const hit=(S.cache||{})[code];if(hit){pick(hit);return}
- $('#pk').innerHTML='<p class="sub">Suche in Open Food Facts …</p>';
+ $('#res').hidden=true;
+ $('#pk').innerHTML=`<p class="sub">Barcode ${code} erkannt. Suche in Open Food Facts …</p>`;
  try{
   const r=await fetch(`${OFF}/api/v2/product/${code}.json?${OFFQ}`);
   const j=await r.json();
-  const f=j.status===1&&j.product?toFood(j.product):null;
-  if(!f){$('#pk').innerHTML='<p class="sub">Produkt nicht gefunden oder ohne Nährwerte. Lege es mit „Eigenes anlegen“ an.</p>';return}
-  (S.cache=S.cache||{})[code]=f;save();pick(f);
- }catch(err){$('#pk').innerHTML='<p class="sub">Keine Verbindung zu Open Food Facts. Gescannte Produkte sind nach dem ersten Abruf auch offline verfügbar.</p>'}
+  if(!(j.status===1&&j.product)){$('#pk').innerHTML=`<p class="sub">Barcode ${code} ist in Open Food Facts nicht eingetragen. Lege das Produkt mit „Eigenes anlegen“ an.</p>`;return}
+  const f=toFood(j.product);
+  if(!f){$('#pk').innerHTML=`<p class="sub">Produkt zu ${code} gefunden, aber ohne Nährwerte in der Datenbank. Lege es mit „Eigenes anlegen“ an.</p>`;return}
+  f.code=code;(S.cache=S.cache||{})[code]=f;save();pick(f);
+ }catch(err){$('#pk').innerHTML=`<p class="sub">Barcode ${code} erkannt, aber keine Verbindung zu Open Food Facts. Prüfe dein Netz und tippe den Code unten erneut ein.</p>`}
 }
 async function onlineSearch(){
  const q=$('#q').value.trim();if(q.length<2){$('#q').focus();return}
- $('#res').innerHTML='<p class="sub">Suche online …</p>';
+ $('#res').hidden=false;$('#res').innerHTML='<p class="sub">Suche online …</p>';
  try{
   const r=await fetch(`${OFF}/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=15&${OFFQ}`);
   const j=await r.json();
@@ -402,28 +413,58 @@ async function onlineSearch(){
   $('#res').innerHTML=ctx.list.length?ctx.list.map((f,i)=>`<button data-pick="${i}">${esc(f.n)}<span>${f.k} kcal</span></button>`).join(''):'<p class="sub">Online nichts gefunden.</p>';
  }catch(err){$('#res').innerHTML='<p class="sub">Keine Verbindung zu Open Food Facts.</p>'}
 }
+const scanMsg=t=>{const m=$('#sm');if(m)m.textContent=t};
 async function scan(){
  stopScan();
- $('#pk').innerHTML=`<div class="pk"><div id="vw"><video id="vd" playsinline muted></video></div><p class="sub" id="sm">Halte den Barcode ins Bild.</p>
+ $('#res').hidden=true;
+ $('#pk').innerHTML=`<div class="pk"><div id="vw"><video id="vd" playsinline muted autoplay></video></div><p class="sub" id="sm">Kamera startet …</p>
  <div class="row"><input id="bc" type="text" inputmode="numeric" placeholder="Oder Barcode eintippen" aria-label="Barcode"><button class="ghost" id="bs">Suchen</button></div>
  <div class="row"><button class="ghost" id="stop">Abbrechen</button></div></div>`;
  try{
+  let Det=null,eng='';
   if('BarcodeDetector' in window){
-   stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
-   const v=$('#vd');v.srcObject=stream;await v.play();
-   const det=new BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e']});scanOn=true;
-   const tick=async()=>{if(!scanOn)return;
-    try{const r=await det.detect(v);if(r.length){stopScan();lookup(r[0].rawValue);return}}catch(e){}
-    requestAnimationFrame(tick)};
-   tick();
-  }else{
-   await loadScript(H5);
-   $('#vw').innerHTML='';
-   h5=new Html5Qrcode('vw');
-   const F=Html5QrcodeSupportedFormats;
-   await h5.start({facingMode:'environment'},{fps:10,qrbox:{width:260,height:150},formatsToSupport:[F.EAN_13,F.EAN_8,F.UPC_A,F.UPC_E]},code=>{stopScan();lookup(code)},()=>{});
-  }
- }catch(err){const m=$('#sm');if(m)m.textContent='Kamera nicht verfügbar oder nicht erlaubt. Du kannst den Code unten eintippen.'}
+   let sup=[];try{sup=await window.BarcodeDetector.getSupportedFormats()}catch(e){}
+   if(sup.includes('ean_13')){Det=window.BarcodeDetector;eng='nativ'}}
+  if(!Det){try{scanMsg('Scanner wird geladen …');Det=(await import(BD)).BarcodeDetector;eng='wasm'}catch(e){Det=null}}
+  if(Det)await scanLoop(Det,eng);else await scanH5();
+ }catch(err){const n=err&&err.name;
+  scanMsg(n==='NotAllowedError'?'Kamerazugriff verweigert. Erlaube die Kamera in den iPhone-Einstellungen unter Safari bzw. Bilanz.':n==='NotFoundError'?'Keine Kamera gefunden.':'Kamera nicht verfügbar. Tippe die Zahl unter dem Barcode ein.')}
+}
+async function scanLoop(Det,eng){
+ stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}}});
+ try{await stream.getVideoTracks()[0].applyConstraints({advanced:[{focusMode:'continuous'}]})}catch(e){}
+ const v=$('#vd');v.srcObject=stream;await v.play();
+ const det=new Det({formats:['ean_13','ean_8','upc_a','upc_e']});
+ const cv=document.createElement('canvas'),cx=cv.getContext('2d',{willReadFrequently:true});
+ scanOn=true;const t0=Date.now();let errs=0,ready=false,hinted=false;
+ scanMsg('Scanner wird vorbereitet …');
+ const step=async()=>{
+  if(!scanOn)return;
+  try{
+   if(v.videoWidth){
+    const sc=Math.min(1,1280/v.videoWidth);cv.width=Math.round(v.videoWidth*sc);cv.height=Math.round(v.videoHeight*sc);
+    cx.drawImage(v,0,0,cv.width,cv.height);
+    const r=await det.detect(cx.getImageData(0,0,cv.width,cv.height));
+    if(!scanOn)return;
+    if(!ready){ready=true;scanMsg(`Scanner bereit (${eng}, ${v.videoWidth}×${v.videoHeight}). Halte den Barcode ruhig 15 bis 20 cm vor die Kamera.`)}
+    errs=0;
+    if(r&&r.length){stopScan();lookup(r[0].rawValue);return}
+   }
+  }catch(e){if(++errs>=3){stopScan();scanMsg('Scanner-Modul nicht verfügbar, wechsle zum Ersatz …');await scanH5();return}}
+  if(ready&&!hinted&&Date.now()-t0>15000){hinted=true;scanMsg('Noch nichts erkannt. Mehr Licht, Barcode quer ins Bild halten oder die Zahl unten eintippen.')}
+  scanT=setTimeout(step,140)};
+ step();
+}
+async function scanH5(){
+ try{
+  await loadScript(H5);
+  const vw=$('#vw');if(!vw)return;
+  vw.innerHTML='';vw.dataset.h5='1';
+  h5=new Html5Qrcode('vw');
+  const F=Html5QrcodeSupportedFormats;
+  await h5.start({facingMode:'environment'},{fps:8,qrbox:(w,h)=>({width:Math.floor(w*.9),height:Math.floor(Math.min(h,w*.6)*.5)}),formatsToSupport:[F.EAN_13,F.EAN_8,F.UPC_A,F.UPC_E],experimentalFeatures:{useBarCodeDetectorIfSupported:true}},code=>{stopScan();lookup(code)},()=>{});
+  scanMsg('Scanner bereit (Ersatz). Halte den Barcode ruhig ins Bild.');
+ }catch(err){scanMsg('Der Scanner konnte nicht starten. Erlaube die Kamera oder tippe die Zahl unter dem Barcode ein.')}
 }
 dlg.addEventListener('close',stopScan);
 const gl=e=>{if(dlg.contains(e.target)&&(e.target.dataset.pf!==undefined||e.target.id==='gm'))goalsLive()};
